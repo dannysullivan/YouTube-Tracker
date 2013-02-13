@@ -1,0 +1,19 @@
+YouTube-Tracker by Danny Sullivan
+
+
+This script is a generalized version of script I wrote for the Wesleyan
+Media Project in 2012.  Its purpose was to track the daily view counts for YouTube videos considered relevant to each of the two major candidates in the 2012 presidential election (Obama and Romney).  The goal was to try to find videos that went viral leading up to the election (we defined "going viral" as "having a huge increase in views over the course of a short time span").  
+
+Since YouTube does not provide easy access to daily changes in view count, this script finds daily view count changes by keeping a database of a huge number of videos (up to 2000 are added per day) and with fields for each date on which the script is run containing the view count on that day.  Comparing one day's view count for a given video with the previous day's allows us to find the daily view count for that video.
+
+This "backend" database contains minimal information about each video.  Every day, the 100 videos with the highest change in view count in the last day are added to a second database, called "highlights", that contains more detailed information about the videos (their titles, descriptions, etc.).
+
+The script is run using a command of the form:
+
+python youtubetracker.py keyword
+
+where keyword is the search term.  The script can be run on multiple search terms every day, since it contains 
+
+
+Version 1.0:
+Current issues/plans -- Sometimes adding new videos causes the program to get stuck or crash.  I'm considering cutting down the number of videos added per day and/or looking into YouTube developer keys.

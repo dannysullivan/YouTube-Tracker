@@ -36,81 +36,25 @@ def main():
     """
     socket.setdefaulttimeout(10)
 
-    """
     f = open("fields.txt", "a")
     f.write(today + "\n")
     f.close()
-    """
+
+    
     print("Update Views")
     errors = updateViews()
-    print errors
     print("Handle Errors")
     handleErrors(errors)
-    """
     print("Get New Videos")
     getNewVideos()
     print("Add Top Videos")
     addTopVideos()
+    print("Update Highlights")
     updateHighlights()
-    """
 
-def updateHighlights():
-    """
-    
-    """
-    db = conn.obamadata
-    for entry in db.obamahighlights.find():
-        id = entry["_id"]
-        dbEntry = db.obamadata.find({"_id":id})
-        for attr in dbEntry:
-            for key in attr:
-                a = attr[key]
-                db.obamahighlights.update(entry, {'$set':{key:a}})
+    #o = open("output/" + keyword + "/" + today + ".csv", "a")
 
 
-def addTopVideosObama():
-    db = conn.obamadata
-    for entry in db.obamadata.find():
-        # flag1 is 0 if there's viewcount data for the first date
-        flag1 = 0
-        flag2 = 0
-        difference = 0
-        try:
-            views1 = int(entry[yesterday])
-        except (KeyError, ValueError, TypeError):
-            flag1 = 1
-        try: 
-            views2 = int(entry[today])
-        except (KeyError, ValueError, TypeError):
-            flag2 = 1
-
-        if ((flag1 == 0) and (flag2 == 0)):
-            difference = views2 - views1
-            db.obamadata.update(entry, {'$set':{str(today + 'daily'):difference}})
-
-    list = db.obamadata.find().sort(str(today + 'daily'), -1).limit(100)
-    for item in list:
-        
-        video = YouTubeVideo(item['_id'])
-        video.get_data()
-
-        try:
-            db.obamahighlights.insert({"_id":video.metadata['_id'],"uploaded":video.metadata['uploaded'],
-                "description":video.metadata['description'],"title":video.metadata["title"],
-                "duration":video.metadata['duration'],"uploader":video.metadata['uploader'], 
-                "category":video.metadata["category"]})
-            for attr in item:
-                a = item[attr]
-                db.obamahighlights.update({"_id":video.metadata['_id']},
-                    {'$set' : {attr:a}})
-        except (pymongo.errors.DuplicateKeyError, ValueError, AttributeError,
-            KeyError):
-            # YouTube video data is already in MongoDB, or no more entries in
-            # feed.
-            pass
-
-
-            
 def getNewVideos():
     """
     Uses the YouTube API to get video feeds containing up 1000 videos uploaded
@@ -143,17 +87,17 @@ def processFeed(feed):
 
             video = yt_service.GetYouTubeVideoEntry(video_id=id)
 
-            backend.insert({'_id':id, today:video.statistics.view_count})
+            backend.insert({'_id':id, today:int(video.statistics.view_count)})
             print "Video id: " + id + " added to database."
 
         except gdata.service.RequestError:
-            continue
+            time.sleep(10)
         except (pymongo.errors.DuplicateKeyError, ValueError, AttributeError,
             KeyError):
             # YouTube video data is already in MongoDB, or no more entries in
             # feed.
             pass
-        time.sleep(1)
+        #time.sleep(1)
         
 
 def updateViews():
@@ -302,7 +246,64 @@ def handleErrors(errors):
             print e
             continue
 
-    
+
+def addTopVideos():
+
+    for entry in backend.find():
+        # flag1 is 0 if there's viewcount data for the first date
+        flag1 = 0
+        flag2 = 0
+        difference = 0
+        try:
+            views1 = int(entry[yesterday])
+        except (KeyError, ValueError, TypeError):
+            flag1 = 1
+        try: 
+            views2 = int(entry[today])
+        except (KeyError, ValueError, TypeError):
+            flag2 = 1
+
+        if ((flag1 == 0) and (flag2 == 0)):
+            difference = views2 - views1
+            backend.update(entry, {'$set':{str(today + 'daily'):difference}})
+
+    list = backend.find().sort(str(today + 'daily'), -1).limit(100)
+    for item in list:
+        
+        video = yt_service.GetYouTubeVideoEntry(video_id=item['_id'])
+
+        try:
+            highlights.insert({"_id":item['_id'],"uploaded":video.published.text,
+                "description":video.media.description.text,"title":video.media.title.text,
+                "duration":video.media.duration.seconds, 
+                "category":video.media.category[0].text, "tags":video.media.keywords.text})
+
+            #Update the entry in highlights so that it matches all the
+            #attributes in backend (this allows us to ensure that any new view
+            #count data is copied to highlights)
+            for attr in item:
+                a = item[attr]
+                highlights.update({"_id":item['_id']},
+                    {'$set' : {attr:a}})
+        except (pymongo.errors.DuplicateKeyError, ValueError, AttributeError,
+            KeyError):
+            # YouTube video data is already in MongoDB, or no more entries in
+            # feed.
+            pass
+
+def updateHighlights():
+    """
+    Copies data from backend to highlights to ensure that all new view count
+    information is fully updated in both databases.
+    """
+    for entry in highlights.find():
+        id = entry["_id"]
+        dbEntry = backend.find({"_id":id})
+        for attr in dbEntry:
+            for key in attr:
+                a = attr[key]
+                highlights.update(entry, {'$set':{key:a}})
+
 
 if __name__ == "__main__":
     
