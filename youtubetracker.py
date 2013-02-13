@@ -40,16 +40,16 @@ def main():
     f = open("fields.txt", "a")
     f.write(today + "\n")
     f.close()
-
-    print("update views")
-    updateViews()
-    print("handle Errors Obama")
-    handleErrors()
     """
-    print("get new videos")
+    print("Update Views")
+    errors = updateViews()
+    print errors
+    print("Handle Errors")
+    handleErrors(errors)
+    """
+    print("Get New Videos")
     getNewVideos()
-    """
-    print("addTopVideosObama")
+    print("Add Top Videos")
     addTopVideos()
     updateHighlights()
     """
@@ -143,9 +143,11 @@ def processFeed(feed):
 
             video = yt_service.GetYouTubeVideoEntry(video_id=id)
 
-            #backend.insert({'_id':id, today:video.statistics.view_count})
+            backend.insert({'_id':id, today:video.statistics.view_count})
             print "Video id: " + id + " added to database."
 
+        except gdata.service.RequestError:
+            continue
         except (pymongo.errors.DuplicateKeyError, ValueError, AttributeError,
             KeyError):
             # YouTube video data is already in MongoDB, or no more entries in
@@ -154,14 +156,21 @@ def processFeed(feed):
         time.sleep(1)
         
 
-def updateViewsObama():
+def updateViews():
+    """
+    Adds a new viewcount to each of the videos already in the backend database.
+    Returns an array containing the video ids that caused errors.
+    """
 
-    g = open("errorlogs/errorsdefinite.txt", "a")
+    #g = open("errorlogs/errorsdefinite.txt", "a")
 
+    errors = []
     f = open('errorlogs/errors' + today + '.txt', 'a')
     n = 0
     try:
-        for entry in coll.find({'down':0, today:{'$exists':False}}):
+        print "here"
+        #{'down':0, today:{'$exists':False}}
+        for entry in backend.find():
 
             n = n+1
             print n
@@ -172,8 +181,8 @@ def updateViewsObama():
                 try:
                     newViews = video.statistics.view_count
                     print newViews
+
                 except AttributeError as e:
-                    print e
                     url = 'http://www.youtube.com/watch?v=' + id
                     try:
                         h = urllib2.urlopen(url)
@@ -185,7 +194,7 @@ def updateViewsObama():
                         span = soup('span', {'class':'watch-view-count'})
                         views = int(span[0].strong.text.replace(',',''))
 
-                        db.obamadata.update({'_id':id}, {'$set':
+                        backend.update({'_id':id}, {'$set':
                             {str(datetime.date.today()):views}})    
                         print "o" + str(views)
 
@@ -193,21 +202,30 @@ def updateViewsObama():
                         print "a"
                         continue
 
-                    except (AttributeError, IndexError, HTMLParser.HTMLParseError,
-                        IOError, httplib.BadStatusLine,  pymongo.errors.OperationFailure) as e:
+                    except (AttributeError, IndexError, 
+                        HTMLParser.HTMLParseError,
+                        IOError, httplib.BadStatusLine, 
+                        pymongo.errors.OperationFailure) as e:
+
                         f.write(id)
                         f.write("\n")
+                        errors.append(id)
                         print e
                         continue
 
                     continue
 
-                db.obamadata.update(entry, { "$set" : {
+                backend.update(entry, { "$set" : {
                     today:newViews} })
-                #print entry[str(datetime.date.today())]
+
+
+            #If the YouTube API rejects the requests because there have been 
+            #too many, use urllib2 to get view information.
             except gdata.service.RequestError as e:
                 print e[0]
-                if e[0]['body'] == "<?xml version='1.0' encoding='UTF-8'?><errors><error><domain>yt:quota</domain><code>too_many_recent_calls</code></error></errors>":
+                if e[0]['body'] == ("<?xml version='1.0' encoding='UTF-8'?>" +
+                "<errors><error><domain>yt:quota</domain><code>too_many_rec" +
+                "ent_calls</code></error></errors>"):
 
 
                     url = 'http://www.youtube.com/watch?v=' + id
@@ -221,16 +239,17 @@ def updateViewsObama():
                         span = soup('span', {'class':'watch-view-count'})
                         views = int(span[0].strong.text.replace(',',''))
 
-                        db.obamadata.update({'_id':id}, {'$set':
+                        backend.update({'_id':id}, {'$set':
                             {today:views}})    
-                        print "o" + str(views)
+                        print str(views)
 
                     except urllib2.HTTPError:
-                        print "a"
                         continue
 
-                    except (AttributeError, IndexError, HTMLParser.HTMLParseError,
-                        IOError, httplib.BadStatusLine,  pymongo.errors.OperationFailure) as e:
+                    except (AttributeError, IndexError, 
+                        HTMLParser.HTMLParseError,
+                        IOError, httplib.BadStatusLine,  
+                        pymongo.errors.OperationFailure) as e:
                         f.write(id)
                         f.write("\n")
                         print e
@@ -245,23 +264,19 @@ def updateViewsObama():
                 print e
                 continue
 
-    except pymongo.errors.OperationFailure:
-        updateViews()
+    finally:
+        return errors
+
 
         
 
 
 
-def handleErrorsObama():
-    db = conn.obamadata
+def handleErrors(errors):
     
-    f = open('errorlogs/obamaerrors' + today + '.txt', 'r')
-    client = gdata.youtube.service.YouTubeService()
+    n = open('errorlogs/errors' + today + '.txt', 'w')
 
-    n = open('errorlogs/obamaerrorsfinal' + today + '.txt', 'w')
-
-    for line in f:
-        line = line.rstrip('\n')
+    for line in errors:
         url = 'http://www.youtube.com/watch?v=' + line
         try:
             h = urllib2.urlopen(url)
@@ -273,7 +288,7 @@ def handleErrorsObama():
             span = soup('span', {'class':'watch-view-count'})
             views = int(span[0].strong.text.replace(',',''))
 
-            db.obamadata.update({'_id':line}, {'$set':
+            backend.update({'_id':line}, {'$set':
                     {today:views}})    
             print "o" + str(views)
 
@@ -285,30 +300,6 @@ def handleErrorsObama():
             IOError, httplib.BadStatusLine,  pymongo.errors.OperationFailure) as e:
             n.write(line + "\n")
             print e
-            continue
-
-    f = open('errorlogs/obamaerrorsfinal' + today + '.txt', 'r')
-    client = gdata.youtube.service.YouTubeService()
-
-    for line in f:
-        line = line.rstrip('\n')
-        url = 'http://www.youtube.com/watch?v=' + line
-        try:
-            h = urllib2.urlopen(url)
-            s = h.read()
-            s = s.rstrip('\n')
-            h.close()
-
-            soup = BeautifulSoup(s)
-            span = soup('span', {'class':'watch-view-count'})
-            views = int(span[0].strong.text.replace(',',''))
-
-            db.obamadata.update({'_id':line}, {'$set':
-                    {today:views}})    
-            print "o" + str(views)
-
-        except (AttributeError, IndexError, HTMLParser.HTMLParseError,
-            IOError, httplib.BadStatusLine, pymongo.errors.OperationFailure):
             continue
 
     
