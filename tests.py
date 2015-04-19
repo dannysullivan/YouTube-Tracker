@@ -28,14 +28,15 @@ class DatabaseTest(object):
 class TestVideoMethods(DatabaseTest, unittest.TestCase):
     def setUp(self):
         super(TestVideoMethods, self).setUp()
-        self.existing_video = Video(title = "TestVideo", url = "www.youtube.com/testvideo")
+        self.existing_video = Video(youtube_id = "testvideo")
         self.session.add(self.existing_video)
         self.session.commit()
 
     def test_find_or_create(self):
-        duplicate_video = Video(title = "TestVideo", url = "www.youtube.com/testvideo").find_or_create(self.session)
-        new_video = Video(title = "OtherTestVideo", url = "www.youtube.com/othertestvideo").find_or_create(self.session)
+        duplicate_video = Video(youtube_id = "testvideo").find_or_create(self.session)
+        new_video = Video(youtube_id = "othertestvideo").find_or_create(self.session)
         self.assertEqual(duplicate_video.id, self.existing_video.id)
+        self.assertIsNotNone(new_video.id)
         self.assertNotEqual(new_video.id, self.existing_video.id)
 
 class TestVideoDateMethods(DatabaseTest, unittest.TestCase):

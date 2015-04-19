@@ -12,43 +12,30 @@ from sqlalchemy import ForeignKey
 import gdata.youtube
 import gdata.youtube.service
 
-engine = create_engine('sqlite:///:memory:', echo=True)
+engine = create_engine('postgresql://@localhost/my_database')
 Base = declarative_base()
 Session = sessionmaker(bind=engine)
 session = Session()
-
-# def main():
-    # connect_to_database()
-  
-# def connect_to_database():
-    # #Define our connection string
-    # conn_string = "host='localhost' dbname='my_database'"
-
-    # # print the connection string we will use to connect
-    # print "Connecting to database\n	->%s" % (conn_string)
-
-    # # get a connection, if a connect cannot be made an exception will be raised here
-    # conn = psycopg2.connect(conn_string)
-
-    # # conn.cursor will return a cursor object, you can use this cursor to perform queries
-    # cursor = conn.cursor()
-    # print "Connected!\n"
 
 #models
 class Video(Base):
     __tablename__ = 'videos'
     
     id = Column(Integer, Sequence('video_id_seq'), primary_key = 'true')
-    title = Column(String)
-    url = Column(String)
+    youtube_id = Column(String)
     search_term = Column(String)
 
     def find_or_create(self, session):
-        existing_video = session.query(Video).filter_by(url = self.url).first()
+        """
+        Returns a new, persisted Video record if the video has not yet been entered
+        into the database; otherwise, returns the record of the video in the database
+        """
+        existing_video = session.query(Video).filter_by(youtube_id = self.youtube_id).first()
         if existing_video is not None:
             return existing_video
         else:
             session.add(self)
+            session.flush()
             return self
 
 class VideoDate(Base):
@@ -60,6 +47,9 @@ class VideoDate(Base):
     view_count = Column(Integer)
 
     def previous_video_date(self, session):
+        """
+        Returns the previous date's VideoDate record
+        """
         previous_date = self.date - timedelta(days = 1)
         return session.query(VideoDate).filter_by(video_id = self.video_id, date = previous_date).first()
 
@@ -71,11 +61,14 @@ class VideoDate(Base):
 
 class VideoFetcher(object):
     def __init__(self, search_term):
+        """
+        Initializes YouTube API service and client
+        """
         self.client = gdata.youtube.service.YouTubeService()
         self.yt_service = gdata.youtube.service.YouTubeService()
 
         self.search_term = search_term
-        self.date = date.today
+        self.date = date.today()
 
     def get_new_videos(self):
         """
@@ -84,22 +77,26 @@ class VideoFetcher(object):
         """
         feed = self.client.GetYouTubeVideoFeed(self.youtube_api_request_url())
         for entry in feed.entry:
-            video = Video(title = entry.media.title.text, url = entry.GetSwfUrl()).find_or_create(session)
-            # video_date = VideoDate(video_id = video.id, date = self.date, view_count = entry.statistics.view_count)
-            # session.add(video_date)
+            id = entry.GetSwfUrl()[26:37]
+            video = Video(youtube_id = id, search_term = self.search_term).find_or_create(session)
+            video_date = VideoDate(video_id = video.id, date = self.date, view_count = entry.statistics.view_count)
+            session.add(video_date)
 
     def youtube_api_request_url(self):
+        """
+        Returns the url string for the YouTube API request
+        """
         url_string = ("http://gdata.youtube.com/feeds/api/videos?v=2&q="
         + self.search_term + "&start-index=1&max-results=50&time=today&strict=true")
         return url_string
-            
 
 # Set up schema
 Base.metadata.create_all(engine) 
 
 def main():
-    video_fetcher = VideoFetcher('someSearch')
+    video_fetcher = VideoFetcher('a')
     video_fetcher.get_new_videos()
+    session.commit()
 
 if __name__=="__main__":
     main()
