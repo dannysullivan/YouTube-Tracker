@@ -3,19 +3,15 @@ import psycopg2
 import sqlalchemy
 import untangle
 from datetime import date, timedelta
-from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, Date
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import Sequence
 from sqlalchemy import ForeignKey
 import gdata.youtube
 import gdata.youtube.service
+from database import engine, session
 
-engine = create_engine('postgresql://@localhost/my_database')
 Base = declarative_base()
-Session = sessionmaker(bind=engine)
-session = Session()
 
 #models
 class Video(Base):
@@ -101,13 +97,3 @@ class VideoFetcher(object):
         return url_string
 
 # Set up schema
-Base.metadata.create_all(engine) 
-
-def main():
-    video_fetcher = VideoFetcher('a', 10)
-    video_fetcher.get_new_views_for_existing_videos()
-    video_fetcher.get_new_videos()
-    session.commit()
-
-if __name__=="__main__":
-    main()
