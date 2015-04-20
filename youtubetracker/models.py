@@ -15,6 +15,9 @@ Base = declarative_base()
 
 #models
 class Video(Base):
+    """
+    Represents a unique YouTube video
+    """
     __tablename__ = 'videos'
     
     id = Column(Integer, Sequence('video_id_seq'), primary_key = 'true')
@@ -35,6 +38,10 @@ class Video(Base):
             return self
 
 class VideoDate(Base):
+    """
+    Represents a snapchat of a YouTube video's attributes (such as view count) on a
+    specific date
+    """
     __tablename__ = 'video_dates'
     
     id = Column(Integer, Sequence('video_date_id_seq'), primary_key = 'true')
@@ -58,6 +65,11 @@ class VideoDate(Base):
             return self.view_count - previous_video_date.view_count
 
 class VideoFetcher(object):
+    """
+    Provides methods related to fetching new videos and new view counts for existing videos
+    via the YouTube API
+    """
+
     def __init__(self, search_term, max_results):
         """
         Initializes YouTube API service and client
