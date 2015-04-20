@@ -99,3 +99,4 @@ class VideoFetcher(object):
         return url_string
 
 # Set up schema
+Base.metadata.create_all(engine)
