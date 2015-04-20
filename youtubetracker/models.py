@@ -53,7 +53,9 @@ class VideoDate(Base):
         """
         Returns the difference between today's and yesterday's view counts for the same video
         """
-        return self.view_count - self.previous_video_date(session).view_count
+        previous_video_date = self.previous_video_date(session)
+        if previous_video_date is not None:
+            return self.view_count - previous_video_date.view_count
 
 class VideoFetcher(object):
     def __init__(self, search_term, max_results):
