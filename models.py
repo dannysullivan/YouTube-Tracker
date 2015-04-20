@@ -60,7 +60,7 @@ class VideoDate(Base):
         return self.view_count - self.previous_video_date(session).view_count
 
 class VideoFetcher(object):
-    def __init__(self, search_term):
+    def __init__(self, search_term, max_results):
         """
         Initializes YouTube API service and client
         """
@@ -69,6 +69,7 @@ class VideoFetcher(object):
 
         self.search_term = search_term
         self.date = date.today()
+        self.max_results = max_results
 
     def get_new_videos(self):
         """
@@ -82,19 +83,29 @@ class VideoFetcher(object):
             video_date = VideoDate(video_id = video.id, date = self.date, view_count = entry.statistics.view_count)
             session.add(video_date)
 
+    def get_new_views_for_existing_videos(self):
+        """
+        Creates a new video_date record for videos that are already in the database
+        """
+        for existing_video in session.query(Video).filter_by(search_term = self.search_term):
+            entry = self.yt_service.GetYouTubeVideoEntry(video_id=existing_video.youtube_id)
+            video_date = VideoDate(video_id = existing_video.id, date = self.date, view_count = entry.statistics.view_count)
+            session.add(video_date)
+
     def youtube_api_request_url(self):
         """
         Returns the url string for the YouTube API request
         """
         url_string = ("http://gdata.youtube.com/feeds/api/videos?v=2&q="
-        + self.search_term + "&start-index=1&max-results=50&time=today&strict=true")
+        + self.search_term + "&start-index=1&max-results=" + str(self.max_results) + "&time=today&strict=true")
         return url_string
 
 # Set up schema
 Base.metadata.create_all(engine) 
 
 def main():
-    video_fetcher = VideoFetcher('a')
+    video_fetcher = VideoFetcher('a', 10)
+    video_fetcher.get_new_views_for_existing_videos()
     video_fetcher.get_new_videos()
     session.commit()
 

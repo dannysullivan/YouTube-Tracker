@@ -59,8 +59,10 @@ class TestVideoDateMethods(DatabaseTest, unittest.TestCase):
 
 class TestVideoFetcherMethods(unittest.TestCase):
     def test_youtube_api_request_url(self):
-        video_fetcher = VideoFetcher("someSearchTerm")
-        self.assertIn("someSearchTerm", video_fetcher.youtube_api_request_url())
+        video_fetcher = VideoFetcher("someSearchTerm", 10)
+        request_url = video_fetcher.youtube_api_request_url()
+        self.assertIn("someSearchTerm", request_url)
+        self.assertIn("max-results=10", request_url)
 
 if __name__ == '__main__':
     setup_module()
