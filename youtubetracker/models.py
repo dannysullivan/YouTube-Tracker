@@ -9,7 +9,6 @@ from sqlalchemy import Sequence
 from sqlalchemy import ForeignKey
 import gdata.youtube
 import gdata.youtube.service
-from database import engine, session
 
 Base = declarative_base()
 
@@ -81,7 +80,7 @@ class VideoFetcher(object):
         self.date = date.today()
         self.max_results = max_results
 
-    def get_new_videos(self):
+    def get_new_videos(self, session):
         """
         Uses the YouTube API to get a video feeds containing up to 50 videos uploaded
         today
@@ -93,7 +92,7 @@ class VideoFetcher(object):
             video_date = VideoDate(video_id = video.id, date = self.date, view_count = entry.statistics.view_count)
             session.add(video_date)
 
-    def get_new_views_for_existing_videos(self):
+    def get_new_views_for_existing_videos(self, session):
         """
         Creates a new video_date record for videos that are already in the database
         """
@@ -109,6 +108,3 @@ class VideoFetcher(object):
         url_string = ("http://gdata.youtube.com/feeds/api/videos?v=2&q="
         + self.search_term + "&start-index=1&max-results=" + str(self.max_results) + "&time=today&strict=true")
         return url_string
-
-# Set up schema
-Base.metadata.create_all(engine)
